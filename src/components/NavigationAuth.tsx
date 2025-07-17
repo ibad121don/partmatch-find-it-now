@@ -1,5 +1,5 @@
-
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { LogOut, User, Settings, MessageCircle } from "lucide-react";
@@ -22,45 +22,53 @@ const NavigationAuth = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const displayName = useUserDisplayName('User');
+  const displayName = useUserDisplayName("User");
+  const { t } = useTranslation();
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
     try {
       // Check if there's an active session before attempting signout
-      const { data: { session } } = await supabase.auth.getSession();
-      
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       if (!session) {
         // No active session, just redirect to home
-        console.log('No active session found, redirecting to home');
-        navigate('/');
+        console.log("No active session found, redirecting to home");
+        navigate("/");
         return;
       }
 
       const { error } = await supabase.auth.signOut();
       if (error) {
         // If it's a session missing error, just redirect instead of showing error
-        if (error.message.includes('Auth session missing') || error.message.includes('Session not found')) {
-          console.log('Session already expired, redirecting to home');
-          navigate('/');
+        if (
+          error.message.includes("Auth session missing") ||
+          error.message.includes("Session not found")
+        ) {
+          console.log("Session already expired, redirecting to home");
+          navigate("/");
           return;
         }
         throw error;
       }
-      
-      navigate('/');
+
+      navigate("/");
     } catch (error: any) {
-      console.error('Error signing out:', error);
-      
+      console.error("Error signing out:", error);
+
       // For session-related errors, just redirect without showing error toast
-      if (error.message?.includes('Auth session missing') || 
-          error.message?.includes('Session not found') ||
-          error.name === 'AuthSessionMissingError') {
-        console.log('Session error during signout, redirecting to home');
-        navigate('/');
+      if (
+        error.message?.includes("Auth session missing") ||
+        error.message?.includes("Session not found") ||
+        error.name === "AuthSessionMissingError"
+      ) {
+        console.log("Session error during signout, redirecting to home");
+        navigate("/");
         return;
       }
-      
+
       // Only show error toast for other types of errors
       toast({
         title: "Error signing out",
@@ -86,13 +94,11 @@ const NavigationAuth = () => {
       <div className="flex items-center gap-2">
         <Link to="/auth">
           <Button variant="ghost" size="sm">
-            Sign In
+            {t("navbar.signIn", "Sign In")}
           </Button>
         </Link>
         <Link to="/auth">
-          <Button size="sm">
-            Get Started
-          </Button>
+          <Button size="sm">{t("navbar.getStarted", "Get Started")}</Button>
         </Link>
       </div>
     );
@@ -103,14 +109,14 @@ const NavigationAuth = () => {
       <span className="text-sm text-gray-600 hidden sm:block">
         Welcome, {displayName}
       </span>
-      
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative h-8 w-8 rounded-full">
             <Avatar className="h-8 w-8">
               <AvatarImage src="" alt="User avatar" />
               <AvatarFallback className="bg-purple-100 text-purple-700">
-                {getInitials(user.email || 'U')}
+                {getInitials(user.email || "U")}
               </AvatarFallback>
             </Avatar>
           </Button>
@@ -125,13 +131,13 @@ const NavigationAuth = () => {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem 
-            onClick={handleSignOut} 
+          <DropdownMenuItem
+            onClick={handleSignOut}
             disabled={isSigningOut}
             className="text-red-600 focus:text-red-600"
           >
             <LogOut className="mr-2 h-4 w-4" />
-            <span>{isSigningOut ? 'Signing out...' : 'Sign out'}</span>
+            <span>{isSigningOut ? "Signing out..." : "Sign out"}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

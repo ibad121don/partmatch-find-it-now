@@ -1,32 +1,33 @@
-
 import { Badge } from "@/components/ui/badge";
 import { Star } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface SellerRatingDisplayProps {
   rating: number;
   totalRatings: number;
-  size?: 'sm' | 'md' | 'lg';
+  size?: "sm" | "md" | "lg";
   showBadge?: boolean;
   className?: string;
 }
 
-const SellerRatingDisplay = ({ 
-  rating, 
-  totalRatings, 
-  size = 'md', 
+const SellerRatingDisplay = ({
+  rating,
+  totalRatings,
+  size = "md",
   showBadge = false,
-  className = "" 
+  className = "",
 }: SellerRatingDisplayProps) => {
+  const { t } = useTranslation();
   const sizeClasses = {
     sm: "text-xs",
     md: "text-sm",
-    lg: "text-base"
+    lg: "text-base",
   };
 
   const iconSizes = {
     sm: "h-3 w-3",
     md: "h-4 w-4",
-    lg: "h-5 w-5"
+    lg: "h-5 w-5",
   };
 
   const renderStars = () => {
@@ -37,24 +38,21 @@ const SellerRatingDisplay = ({
     for (let i = 0; i < 5; i++) {
       if (i < fullStars) {
         stars.push(
-          <Star 
-            key={i} 
-            className={`${iconSizes[size]} fill-yellow-400 text-yellow-400`} 
+          <Star
+            key={i}
+            className={`${iconSizes[size]} fill-yellow-400 text-yellow-400`}
           />
         );
       } else if (i === fullStars && hasHalfStar) {
         stars.push(
-          <Star 
-            key={i} 
-            className={`${iconSizes[size]} fill-yellow-400/50 text-yellow-400`} 
+          <Star
+            key={i}
+            className={`${iconSizes[size]} fill-yellow-400/50 text-yellow-400`}
           />
         );
       } else {
         stars.push(
-          <Star 
-            key={i} 
-            className={`${iconSizes[size]} text-gray-300`} 
-          />
+          <Star key={i} className={`${iconSizes[size]} text-gray-300`} />
         );
       }
     }
@@ -65,8 +63,10 @@ const SellerRatingDisplay = ({
 
   if (totalRatings === 0) {
     return (
-      <div className={`flex items-center gap-1 ${sizeClasses[size]} text-gray-500 ${className}`}>
-        <span>No ratings yet</span>
+      <div
+        className={`flex items-center gap-1 ${sizeClasses[size]} text-gray-500 ${className}`}
+      >
+        <span>{t("ratings.noRatings", "No ratings yet")}</span>
       </div>
     );
   }
@@ -79,13 +79,17 @@ const SellerRatingDisplay = ({
           {rating.toFixed(1)}
         </span>
         <span className={`${sizeClasses[size]} text-gray-500`}>
-          ({totalRatings} review{totalRatings !== 1 ? 's' : ''})
+          {t("ratings.reviewCount", {
+            count: totalRatings,
+            defaultValue: `(${totalRatings} review${
+              totalRatings !== 1 ? "s" : ""
+            })`,
+          })}
         </span>
       </div>
-      
       {showBadge && isTopRated && (
         <Badge className="bg-gradient-to-r from-yellow-100 to-orange-100 text-yellow-800 border-yellow-200 text-xs px-2 py-1">
-          Top Rated
+          {t("ratings.topRated", "Top Rated")}
         </Badge>
       )}
     </div>
