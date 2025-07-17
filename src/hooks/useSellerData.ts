@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -42,30 +41,39 @@ export const useSellerData = () => {
   const [myOffers, setMyOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasFetchedRef = useRef(false);
+  useEffect(() => {
+    if (user && !hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      fetchData();
+    } else if (!user) {
+      setLoading(false);
+    }
+  }, [user]);
 
   const fetchRequests = async () => {
     try {
-      console.log('useSellerData: Fetching requests');
+      console.log("useSellerData: Fetching requests");
       const { data, error } = await supabase
-        .from('part_requests')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+        .from("part_requests")
+        .select("*")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
 
       if (error) {
-        console.error('useSellerData: Error fetching requests:', error);
+        console.error("useSellerData: Error fetching requests:", error);
         throw error;
       }
 
-      console.log('useSellerData: Fetched requests:', data?.length || 0);
+      console.log("useSellerData: Fetched requests:", data?.length || 0);
       setRequests(data || []);
       return data;
     } catch (error) {
-      console.error('useSellerData: Request fetch failed:', error);
+      console.error("useSellerData: Request fetch failed:", error);
       toast({
         title: "Error",
         description: "Failed to load requests. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
       throw error;
     }
@@ -73,30 +81,32 @@ export const useSellerData = () => {
 
   const fetchMyOffers = async () => {
     try {
-      console.log('useSellerData: Fetching offers for user:', user?.id);
+      console.log("useSellerData: Fetching offers for user:", user?.id);
       const { data, error } = await supabase
-        .from('offers')
-        .select(`
+        .from("offers")
+        .select(
+          `
           *,
           request:part_requests(id, car_make, car_model, car_year, part_needed, phone, location)
-        `)
-        .eq('supplier_id', user?.id)
-        .order('created_at', { ascending: false });
+        `
+        )
+        .eq("supplier_id", user?.id)
+        .order("created_at", { ascending: false });
 
       if (error) {
-        console.error('useSellerData: Error fetching offers:', error);
+        console.error("useSellerData: Error fetching offers:", error);
         throw error;
       }
-      
-      console.log('useSellerData: Fetched offers:', data?.length || 0);
+
+      console.log("useSellerData: Fetched offers:", data?.length || 0);
       setMyOffers(data || []);
       return data;
     } catch (error) {
-      console.error('useSellerData: Offers fetch failed:', error);
+      console.error("useSellerData: Offers fetch failed:", error);
       toast({
         title: "Error",
         description: "Failed to load your offers. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
       throw error;
     }
@@ -106,70 +116,96 @@ export const useSellerData = () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('useSellerData: Starting data fetch');
-      
+      console.log("useSellerData: Starting data fetch");
+
       // Fetch both requests and offers in parallel
       const [requestsResult, offersResult] = await Promise.allSettled([
         fetchRequests(),
-        fetchMyOffers()
+        fetchMyOffers(),
       ]);
 
-      if (requestsResult.status === 'rejected') {
-        console.error('useSellerData: Failed to fetch requests:', requestsResult.reason);
+      if (requestsResult.status === "rejected") {
+        console.error(
+          "useSellerData: Failed to fetch requests:",
+          requestsResult.reason
+        );
       }
 
-      if (offersResult.status === 'rejected') {
-        console.error('useSellerData: Failed to fetch offers:', offersResult.reason);
+      if (offersResult.status === "rejected") {
+        console.error(
+          "useSellerData: Failed to fetch offers:",
+          offersResult.reason
+        );
       }
 
       // If both failed, show error
-      if (requestsResult.status === 'rejected' && offersResult.status === 'rejected') {
-        setError('Failed to load dashboard data. Please try again.');
+      if (
+        requestsResult.status === "rejected" &&
+        offersResult.status === "rejected"
+      ) {
+        setError("Failed to load dashboard data. Please try again.");
       }
-
     } catch (error) {
-      console.error('useSellerData: Unexpected error in fetchData:', error);
-      setError('An unexpected error occurred. Please try again.');
+      console.error("useSellerData: Unexpected error in fetchData:", error);
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
-      console.log('useSellerData: Data fetch completed');
+      console.log("useSellerData: Data fetch completed");
     }
   };
 
+  // useEffect(() => {
+  //   if (user) {
+  //     console.log('useSellerData: User found, fetching data for:', user.id);
+  //     fetchData();
+  //   } else {
+  //     console.log('useSellerData: No user found');
+  //     setLoading(false);
+  //   }
+  // }, [user]);
+
   useEffect(() => {
-    if (user) {
-      console.log('useSellerData: User found, fetching data for:', user.id);
+    // Avoid calling fetchData multiple times if user hasn’t changed
+    let hasFetched = false;
+
+    if (user && !hasFetched) {
+      hasFetched = true;
+      console.log("useSellerData: User found, fetching data for:", user.id);
       fetchData();
-    } else {
-      console.log('useSellerData: No user found');
+    } else if (!user) {
+      console.log("useSellerData: No user found");
       setLoading(false);
     }
-  }, [user]);
+    // Only run once on initial mount (empty dependencies)
+  }, []);
 
   // Set up real-time subscription for offer updates
   useEffect(() => {
     if (!user?.id) return;
 
-    console.log('useSellerData: Setting up realtime subscription for user:', user.id);
+    console.log(
+      "useSellerData: Setting up realtime subscription for user:",
+      user.id
+    );
     const channel = supabase
-      .channel('offer-updates')
+      .channel("offer-updates")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'offers',
-          filter: `supplier_id=eq.${user.id}`
+          event: "UPDATE",
+          schema: "public",
+          table: "offers",
+          filter: `supplier_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('useSellerData: Offer updated via realtime:', payload);
+          console.log("useSellerData: Offer updated via realtime:", payload);
           fetchMyOffers(); // Refresh offers when status changes
         }
       )
       .subscribe();
 
     return () => {
-      console.log('useSellerData: Cleaning up realtime subscription');
+      console.log("useSellerData: Cleaning up realtime subscription");
       supabase.removeChannel(channel);
     };
   }, [user?.id]);
@@ -179,6 +215,6 @@ export const useSellerData = () => {
     myOffers,
     loading,
     error,
-    refetch: fetchData
+    refetch: fetchData,
   };
 };

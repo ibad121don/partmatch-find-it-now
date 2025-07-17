@@ -1,55 +1,137 @@
-
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { Package, Upload, Star, Camera, AlertCircle } from 'lucide-react';
-import PaymentModal from './PaymentModal';
+import React, { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { Package, Upload, Star, Camera, AlertCircle } from "lucide-react";
+import PaymentModal from "./PaymentModal";
+import { convertFromGHS } from "@/utils/exchangeRates";
 
 interface EnhancedPostCarPartFormProps {
   onPartPosted: () => void;
   hasBusinessSubscription?: boolean;
 }
 
-const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false }: EnhancedPostCarPartFormProps) => {
+const EnhancedPostCarPartForm = ({
+  onPartPosted,
+  hasBusinessSubscription = false,
+}: EnhancedPostCarPartFormProps) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [currentPhotos, setCurrentPhotos] = useState<File[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
+  const [currency, setCurrency] = useState("GHS");
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    make: '',
-    model: '',
-    year: '',
-    partType: '',
-    condition: '',
-    price: '',
-    address: '',
+    title: "",
+    description: "",
+    make: "",
+    model: "",
+    year: "",
+    partType: "",
+    condition: "",
+    price: "",
+    address: "",
   });
 
+  useEffect(() => {
+    const detectLocation = async () => {
+      try {
+        if (!navigator.geolocation) {
+          console.warn("Geolocation is not supported");
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const { latitude, longitude } = position.coords;
+
+            console.log("Detected location:", latitude, longitude);
+
+            try {
+              const response = await fetch(
+                `https://api.opencagedata.com/geocode/v1/json?q=${latitude}+${longitude}&key=9bc8410018154a2b98484fb633107c83`
+              );
+
+              const data = await response.json();
+              const result = data?.results?.[0];
+
+              if (result) {
+                const components = result.components;
+                const city =
+                  components.city ||
+                  components.town ||
+                  components.village ||
+                  "";
+                const state = components.state || "";
+                const country = components.country || "";
+                const countryCode = components["ISO_3166-1_alpha-2"] || "";
+
+                const currencyMap: Record<string, string> = {
+                  GH: "GHS",
+                  NG: "NGN",
+                  KE: "KES",
+                  ZA: "ZAR",
+                  US: "USD",
+                  GB: "GBP",
+                  CA: "CAD",
+                  IN: "INR",
+                  PK: "PKR",
+                };
+
+                const detectedCurrency = currencyMap[countryCode] || "USD";
+
+                setFormData((prev) => ({
+                  ...prev,
+                  address: `${city}, ${state}, ${country}`,
+                }));
+                setCurrency(detectedCurrency);
+              } else {
+                console.warn("No result from OpenCage:", data);
+              }
+            } catch (err) {
+              console.error("Failed to reverse geocode:", err);
+            }
+          },
+          (error) => {
+            console.warn("Geolocation error:", error.message);
+          },
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      } catch (error) {
+        console.error("Location detection failed:", error);
+      }
+    };
+
+    detectLocation();
+  }, []);
+
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handlePhotoAdd = (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    
+
     const file = files[0];
-    
+
     if (currentPhotos.length >= 10) {
       toast({
         title: "Photo Limit Reached",
         description: "Maximum 10 photos allowed per listing.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -60,7 +142,7 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
       return;
     }
 
-    setCurrentPhotos(prev => [...prev, file]);
+    setCurrentPhotos((prev) => [...prev, file]);
   };
 
   const handleExtraPhotoPayment = () => {
@@ -70,13 +152,13 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
     });
     setShowPaymentModal(false);
     if (pendingPhoto) {
-      setCurrentPhotos(prev => [...prev, pendingPhoto]);
+      setCurrentPhotos((prev) => [...prev, pendingPhoto]);
       setPendingPhoto(null);
     }
   };
 
   const removePhoto = (index: number) => {
-    setCurrentPhotos(prev => prev.filter((_, i) => i !== index));
+    setCurrentPhotos((prev) => prev.filter((_, i) => i !== index));
   };
 
   const freePhotosRemaining = Math.max(0, 3 - currentPhotos.length);
@@ -84,23 +166,30 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!user) {
       toast({
         title: "Authentication Required",
         description: "Please sign in to post car parts.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
-    // Validate required fields
-    if (!formData.title || !formData.make || !formData.model || !formData.year || 
-        !formData.partType || !formData.condition || !formData.price || !formData.address) {
+    if (
+      !formData.title ||
+      !formData.make ||
+      !formData.model ||
+      !formData.year ||
+      !formData.partType ||
+      !formData.condition ||
+      !formData.price ||
+      !formData.address
+    ) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -115,7 +204,7 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
         toast({
           title: "Invalid Price",
           description: "Please enter a valid price.",
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
@@ -124,48 +213,47 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
         toast({
           title: "Invalid Year",
           description: "Please enter a valid year.",
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
 
-      // Upload images if any
       let imageUrls: string[] = [];
       if (currentPhotos.length > 0) {
         try {
           const uploadPromises = currentPhotos.map(async (photo, index) => {
             const timestamp = Date.now();
-            const fileName = `${user.id}/${timestamp}-${index}.${photo.name.split('.').pop()}`;
-            
-            const { data, error } = await supabase.storage
-              .from('car-part-images')
+            const fileName = `${user.id}/${timestamp}-${index}.${photo.name
+              .split(".")
+              .pop()}`;
+
+            const { error } = await supabase.storage
+              .from("car-part-images")
               .upload(fileName, photo);
 
             if (error) throw error;
-            
-            const { data: { publicUrl } } = supabase.storage
-              .from('car-part-images')
-              .getPublicUrl(fileName);
-            
+
+            const {
+              data: { publicUrl },
+            } = supabase.storage.from("car-part-images").getPublicUrl(fileName);
+
             return publicUrl;
           });
 
           imageUrls = await Promise.all(uploadPromises);
         } catch (uploadError) {
-          console.error('Image upload failed:', uploadError);
+          console.error("Image upload failed:", uploadError);
           toast({
             title: "Image Upload Failed",
             description: "Failed to upload images. Posting without images.",
-            variant: "destructive"
+            variant: "destructive",
           });
         }
       }
 
-      // Determine if listing should be featured (free for business subscribers)
       const isFeatured = hasBusinessSubscription;
-      const listingDuration = hasBusinessSubscription ? 60 : 30; // days
+      const listingDuration = hasBusinessSubscription ? 60 : 30;
 
-      // Prepare part data
       const partData = {
         supplier_id: user.id,
         title: formData.title.trim(),
@@ -176,16 +264,20 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
         part_type: formData.partType,
         condition: formData.condition,
         price: price,
-        currency: 'GHS',
+        currency: currency,
         address: formData.address.trim(),
         images: imageUrls.length > 0 ? imageUrls : null,
-        status: 'available',
+        status: "available",
         is_featured: isFeatured,
-        featured_until: isFeatured ? new Date(Date.now() + listingDuration * 24 * 60 * 60 * 1000).toISOString() : null
+        featured_until: isFeatured
+          ? new Date(
+              Date.now() + listingDuration * 24 * 60 * 60 * 1000
+            ).toISOString()
+          : null,
       };
 
-      const { data, error } = await supabase
-        .from('car_parts')
+      const { error } = await supabase
+        .from("car_parts")
         .insert([partData])
         .select()
         .single();
@@ -196,32 +288,31 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
 
       toast({
         title: "Part Posted Successfully!",
-        description: hasBusinessSubscription 
+        description: hasBusinessSubscription
           ? "Your car part has been posted and featured automatically!"
           : "Your car part has been posted and is now available for buyers.",
       });
 
-      // Reset form
       setFormData({
-        title: '',
-        description: '',
-        make: '',
-        model: '',
-        year: '',
-        partType: '',
-        condition: '',
-        price: '',
-        address: '',
+        title: "",
+        description: "",
+        make: "",
+        model: "",
+        year: "",
+        partType: "",
+        condition: "",
+        price: "",
+        address: "",
       });
       setCurrentPhotos([]);
       onPartPosted();
-
     } catch (error: any) {
-      console.error('Error posting part:', error);
+      console.error("Error posting part:", error);
       toast({
         title: "Posting Failed",
-        description: error.message || "An unexpected error occurred. Please try again.",
-        variant: "destructive"
+        description:
+          error.message || "An unexpected error occurred. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -242,8 +333,8 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
           )}
         </CardTitle>
         <p className="text-gray-600">
-          {hasBusinessSubscription 
-            ? "Post unlimited parts with automatic featuring" 
+          {hasBusinessSubscription
+            ? "Post unlimited parts with automatic featuring"
             : "Add a new car part to your inventory"}
         </p>
       </CardHeader>
@@ -255,7 +346,7 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
             <Input
               id="title"
               value={formData.title}
-              onChange={(e) => handleInputChange('title', e.target.value)}
+              onChange={(e) => handleInputChange("title", e.target.value)}
               placeholder="e.g., Front Brake Pads for Toyota Camry"
               required
             />
@@ -266,7 +357,7 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
             <Textarea
               id="description"
               value={formData.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
+              onChange={(e) => handleInputChange("description", e.target.value)}
               placeholder="Describe the condition, compatibility, and any additional details..."
               rows={3}
             />
@@ -279,7 +370,7 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
               <Input
                 id="make"
                 value={formData.make}
-                onChange={(e) => handleInputChange('make', e.target.value)}
+                onChange={(e) => handleInputChange("make", e.target.value)}
                 placeholder="Toyota"
                 required
               />
@@ -289,7 +380,7 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
               <Input
                 id="model"
                 value={formData.model}
-                onChange={(e) => handleInputChange('model', e.target.value)}
+                onChange={(e) => handleInputChange("model", e.target.value)}
                 placeholder="Camry"
                 required
               />
@@ -300,7 +391,7 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
                 id="year"
                 type="number"
                 value={formData.year}
-                onChange={(e) => handleInputChange('year', e.target.value)}
+                onChange={(e) => handleInputChange("year", e.target.value)}
                 placeholder="2020"
                 min="1990"
                 max={new Date().getFullYear()}
@@ -313,7 +404,10 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Part Type *</Label>
-              <Select value={formData.partType} onValueChange={(value) => handleInputChange('partType', value)}>
+              <Select
+                value={formData.partType}
+                onValueChange={(value) => handleInputChange("partType", value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select part type" />
                 </SelectTrigger>
@@ -332,7 +426,10 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
             </div>
             <div>
               <Label>Condition *</Label>
-              <Select value={formData.condition} onValueChange={(value) => handleInputChange('condition', value)}>
+              <Select
+                value={formData.condition}
+                onValueChange={(value) => handleInputChange("condition", value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select condition" />
                 </SelectTrigger>
@@ -348,13 +445,14 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
           {/* Price and Location */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="price">Price (GHS) *</Label>
+              <Label htmlFor="price">Price ({currency}) *</Label>
+
               <Input
                 id="price"
                 type="number"
                 value={formData.price}
-                onChange={(e) => handleInputChange('price', e.target.value)}
-                placeholder="150.00"
+                onChange={(e) => handleInputChange("price", e.target.value)}
+                placeholder={`e.g., 150.00 ${currency}`}
                 min="0"
                 step="0.01"
                 required
@@ -365,7 +463,7 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
               <Input
                 id="address"
                 value={formData.address}
-                onChange={(e) => handleInputChange('address', e.target.value)}
+                onChange={(e) => handleInputChange("address", e.target.value)}
                 placeholder="Accra, Greater Accra"
                 required
               />
@@ -379,11 +477,16 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
               Part Photos
               {!hasBusinessSubscription && (
                 <Badge variant="outline" className="text-xs">
-                  3 free, then GHS 10 each
+                  3 free, then {currency}{" "}
+                  {Number(convertFromGHS(10, currency)).toLocaleString(
+                    undefined,
+                    { maximumFractionDigits: 2 }
+                  )}{" "}
+                  each
                 </Badge>
               )}
             </Label>
-            
+
             <div className="mt-2">
               <Input
                 type="file"
@@ -391,7 +494,7 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
                 onChange={(e) => handlePhotoAdd(e.target.files)}
                 className="mb-3"
               />
-              
+
               <div className="mt-3 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Photos: {currentPhotos.length}/10</span>
@@ -401,7 +504,7 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
                     </span>
                   )}
                 </div>
-                
+
                 {extraPhotosCost > 0 && !hasBusinessSubscription && (
                   <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-lg">
                     <AlertCircle className="h-4 w-4 text-orange-600" />
@@ -410,7 +513,7 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
                     </span>
                   </div>
                 )}
-                
+
                 {currentPhotos.length > 0 && (
                   <div className="grid grid-cols-4 gap-2 mt-3">
                     {currentPhotos.map((photo, index) => (
@@ -446,12 +549,30 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
           <div className="bg-blue-50 p-4 rounded-lg">
             <div className="flex items-center gap-2 mb-2">
               <AlertCircle className="h-4 w-4 text-blue-600" />
-              <span className="font-medium text-blue-800">Listing Information</span>
+              <span className="font-medium text-blue-800">
+                Listing Information
+              </span>
             </div>
             <ul className="text-sm text-blue-700 space-y-1">
-              <li>• Duration: {hasBusinessSubscription ? '60 days' : '30 days'}</li>
-              <li>• Visibility: {hasBusinessSubscription ? 'Featured automatically' : 'Standard listing'}</li>
-              <li>• Photos: {hasBusinessSubscription ? 'Up to 10 included' : '3 free, GHS 10 per extra'}</li>
+              <li>
+                • Duration: {hasBusinessSubscription ? "60 days" : "30 days"}
+              </li>
+              <li>
+                • Visibility:{" "}
+                {hasBusinessSubscription
+                  ? "Featured automatically"
+                  : "Standard listing"}
+              </li>
+              <li>
+                • Photos:{" "}
+                {hasBusinessSubscription
+                  ? "Up to 10 included"
+                  : `3 free, ${currency} ${Number(
+                      convertFromGHS(10, currency)
+                    ).toLocaleString(undefined, {
+                      maximumFractionDigits: 2,
+                    })} per extra`}
+              </li>
             </ul>
           </div>
 
@@ -460,7 +581,11 @@ const EnhancedPostCarPartForm = ({ onPartPosted, hasBusinessSubscription = false
             disabled={loading}
             className="w-full bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800"
           >
-            {loading ? 'Posting...' : hasBusinessSubscription ? 'Post Featured Listing' : 'Post Car Part'}
+            {loading
+              ? "Posting..."
+              : hasBusinessSubscription
+              ? "Post Featured Listing"
+              : "Post Car Part"}
           </Button>
         </form>
       </CardContent>

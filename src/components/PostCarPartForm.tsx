@@ -1,16 +1,21 @@
-
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { Package, Upload } from 'lucide-react';
-import PhotoUpload from './PhotoUpload';
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { Package, Upload } from "lucide-react";
+import PhotoUpload from "./PhotoUpload";
 
 interface CarPartFormData {
   title: string;
@@ -30,28 +35,28 @@ const PostCarPartForm = ({ onPartPosted }: { onPartPosted: () => void }) => {
   const [loading, setLoading] = useState(false);
   const [currentPhoto, setCurrentPhoto] = useState<File | null>(null);
   const [formData, setFormData] = useState<CarPartFormData>({
-    title: '',
-    description: '',
-    make: '',
-    model: '',
-    year: '',
-    partType: '',
-    condition: '',
-    price: '',
-    address: '',
+    title: "",
+    description: "",
+    make: "",
+    model: "",
+    year: "",
+    partType: "",
+    condition: "",
+    price: "",
+    address: "",
     images: [],
   });
 
   const handleInputChange = (field: keyof CarPartFormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handlePhotoChange = (file: File | null) => {
     setCurrentPhoto(file);
     if (file) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        images: [...prev.images.slice(0, 4), file] // Limit to 5 images
+        images: [...prev.images.slice(0, 4), file], // Limit to 5 images
       }));
     }
   };
@@ -59,25 +64,27 @@ const PostCarPartForm = ({ onPartPosted }: { onPartPosted: () => void }) => {
   const uploadImages = async (images: File[]): Promise<string[]> => {
     const uploadPromises = images.map(async (image, index) => {
       const timestamp = Date.now();
-      const fileName = `${user?.id}/${timestamp}-${index}.${image.name.split('.').pop()}`;
-      
-      console.log('Uploading image:', fileName);
-      
+      const fileName = `${user?.id}/${timestamp}-${index}.${image.name
+        .split(".")
+        .pop()}`;
+
+      console.log("Uploading image:", fileName);
+
       const { data, error } = await supabase.storage
-        .from('car-part-images')
+        .from("car-part-images")
         .upload(fileName, image);
 
       if (error) {
-        console.error('Image upload error:', error);
+        console.error("Image upload error:", error);
         throw error;
       }
-      
+
       // Get the public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('car-part-images')
-        .getPublicUrl(fileName);
-      
-      console.log('Image uploaded successfully, public URL:', publicUrl);
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("car-part-images").getPublicUrl(fileName);
+
+      console.log("Image uploaded successfully, public URL:", publicUrl);
       return publicUrl;
     });
 
@@ -90,22 +97,30 @@ const PostCarPartForm = ({ onPartPosted }: { onPartPosted: () => void }) => {
       toast({
         title: "Authentication Required",
         description: "Please sign in to post car parts.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
     setLoading(true);
-    console.log('Starting car part submission for user:', user.id);
+    console.log("Starting car part submission for user:", user.id);
 
     try {
       // Validate required fields
-      if (!formData.title || !formData.make || !formData.model || !formData.year || 
-          !formData.partType || !formData.condition || !formData.price || !formData.address) {
+      if (
+        !formData.title ||
+        !formData.make ||
+        !formData.model ||
+        !formData.year ||
+        !formData.partType ||
+        !formData.condition ||
+        !formData.price ||
+        !formData.address
+      ) {
         toast({
           title: "Missing Information",
           description: "Please fill in all required fields.",
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
@@ -115,7 +130,7 @@ const PostCarPartForm = ({ onPartPosted }: { onPartPosted: () => void }) => {
         toast({
           title: "Invalid Price",
           description: "Please enter a valid price.",
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
@@ -125,26 +140,26 @@ const PostCarPartForm = ({ onPartPosted }: { onPartPosted: () => void }) => {
         toast({
           title: "Invalid Year",
           description: "Please enter a valid year.",
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
 
-      console.log('Form validation passed, proceeding with submission');
+      console.log("Form validation passed, proceeding with submission");
 
       // Upload images if any
       let imageUrls: string[] = [];
       if (formData.images.length > 0) {
-        console.log('Uploading images:', formData.images.length);
+        console.log("Uploading images:", formData.images.length);
         try {
           imageUrls = await uploadImages(formData.images);
-          console.log('Images uploaded successfully:', imageUrls);
+          console.log("Images uploaded successfully:", imageUrls);
         } catch (uploadError) {
-          console.error('Image upload failed:', uploadError);
+          console.error("Image upload failed:", uploadError);
           toast({
             title: "Image Upload Failed",
             description: "Failed to upload images. Posting without images.",
-            variant: "destructive"
+            variant: "destructive",
           });
           // Continue without images
         }
@@ -161,59 +176,61 @@ const PostCarPartForm = ({ onPartPosted }: { onPartPosted: () => void }) => {
         part_type: formData.partType,
         condition: formData.condition,
         price: price,
-        currency: 'GHS',
+        currency: "GHS",
         address: formData.address.trim(),
         images: imageUrls.length > 0 ? imageUrls : null,
-        status: 'available'
+        status: "available",
       };
 
-      console.log('Submitting part data:', partData);
+      console.log("Submitting part data:", partData);
 
       // Save car part
       const { data, error } = await supabase
-        .from('car_parts')
+        .from("car_parts")
         .insert([partData])
         .select()
         .single();
 
       if (error) {
-        console.error('Supabase insert error:', error);
+        console.error("Supabase insert error:", error);
         toast({
           title: "Posting Failed",
           description: `Error: ${error.message}. Please try again.`,
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
 
-      console.log('Car part posted successfully:', data);
+      console.log("Car part posted successfully:", data);
 
       toast({
         title: "Part Posted Successfully!",
-        description: "Your car part has been posted and is now available for buyers.",
+        description:
+          "Your car part has been posted and is now available for buyers.",
       });
 
       // Reset form
       setFormData({
-        title: '',
-        description: '',
-        make: '',
-        model: '',
-        year: '',
-        partType: '',
-        condition: '',
-        price: '',
-        address: '',
+        title: "",
+        description: "",
+        make: "",
+        model: "",
+        year: "",
+        partType: "",
+        condition: "",
+        price: "",
+        address: "",
         images: [],
       });
       setCurrentPhoto(null);
       onPartPosted();
     } catch (error: any) {
-      console.error('Unexpected error during part posting:', error);
+      console.error("Unexpected error during part posting:", error);
       toast({
         title: "Posting Failed",
-        description: error.message || "An unexpected error occurred. Please try again.",
-        variant: "destructive"
+        description:
+          error.message || "An unexpected error occurred. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -227,9 +244,7 @@ const PostCarPartForm = ({ onPartPosted }: { onPartPosted: () => void }) => {
           <Package className="h-6 w-6" />
           Post Car Part
         </CardTitle>
-        <p className="text-gray-600">
-          Add a new car part to your inventory
-        </p>
+        <p className="text-gray-600">Add a new car part to your inventory</p>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -239,7 +254,7 @@ const PostCarPartForm = ({ onPartPosted }: { onPartPosted: () => void }) => {
             <Input
               id="title"
               value={formData.title}
-              onChange={(e) => handleInputChange('title', e.target.value)}
+              onChange={(e) => handleInputChange("title", e.target.value)}
               placeholder="e.g., Front Brake Pads for Toyota Camry"
               required
             />
@@ -250,7 +265,7 @@ const PostCarPartForm = ({ onPartPosted }: { onPartPosted: () => void }) => {
             <Textarea
               id="description"
               value={formData.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
+              onChange={(e) => handleInputChange("description", e.target.value)}
               placeholder="Describe the condition, compatibility, and any additional details..."
               rows={3}
             />
@@ -263,7 +278,7 @@ const PostCarPartForm = ({ onPartPosted }: { onPartPosted: () => void }) => {
               <Input
                 id="make"
                 value={formData.make}
-                onChange={(e) => handleInputChange('make', e.target.value)}
+                onChange={(e) => handleInputChange("make", e.target.value)}
                 placeholder="Toyota"
                 required
               />
@@ -273,7 +288,7 @@ const PostCarPartForm = ({ onPartPosted }: { onPartPosted: () => void }) => {
               <Input
                 id="model"
                 value={formData.model}
-                onChange={(e) => handleInputChange('model', e.target.value)}
+                onChange={(e) => handleInputChange("model", e.target.value)}
                 placeholder="Camry"
                 required
               />
@@ -284,7 +299,7 @@ const PostCarPartForm = ({ onPartPosted }: { onPartPosted: () => void }) => {
                 id="year"
                 type="number"
                 value={formData.year}
-                onChange={(e) => handleInputChange('year', e.target.value)}
+                onChange={(e) => handleInputChange("year", e.target.value)}
                 placeholder="2020"
                 min="1990"
                 max={new Date().getFullYear()}
@@ -297,7 +312,10 @@ const PostCarPartForm = ({ onPartPosted }: { onPartPosted: () => void }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Part Type *</Label>
-              <Select value={formData.partType} onValueChange={(value) => handleInputChange('partType', value)}>
+              <Select
+                value={formData.partType}
+                onValueChange={(value) => handleInputChange("partType", value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select part type" />
                 </SelectTrigger>
@@ -316,7 +334,10 @@ const PostCarPartForm = ({ onPartPosted }: { onPartPosted: () => void }) => {
             </div>
             <div>
               <Label>Condition *</Label>
-              <Select value={formData.condition} onValueChange={(value) => handleInputChange('condition', value)}>
+              <Select
+                value={formData.condition}
+                onValueChange={(value) => handleInputChange("condition", value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select condition" />
                 </SelectTrigger>
@@ -332,12 +353,12 @@ const PostCarPartForm = ({ onPartPosted }: { onPartPosted: () => void }) => {
           {/* Price and Location */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="price">Price (GHS) *</Label>
+              <Label htmlFor="price">Price (GHS)kklkldkl *</Label>
               <Input
                 id="price"
                 type="number"
                 value={formData.price}
-                onChange={(e) => handleInputChange('price', e.target.value)}
+                onChange={(e) => handleInputChange("price", e.target.value)}
                 placeholder="150.00"
                 min="0"
                 step="0.01"
@@ -349,7 +370,7 @@ const PostCarPartForm = ({ onPartPosted }: { onPartPosted: () => void }) => {
               <Input
                 id="address"
                 value={formData.address}
-                onChange={(e) => handleInputChange('address', e.target.value)}
+                onChange={(e) => handleInputChange("address", e.target.value)}
                 placeholder="Accra, Greater Accra"
                 required
               />
@@ -359,10 +380,14 @@ const PostCarPartForm = ({ onPartPosted }: { onPartPosted: () => void }) => {
           {/* Photo Upload */}
           <div>
             <Label>Part Photos</Label>
-            <PhotoUpload onPhotoChange={handlePhotoChange} currentPhoto={currentPhoto} />
+            <PhotoUpload
+              onPhotoChange={handlePhotoChange}
+              currentPhoto={currentPhoto}
+            />
             {formData.images.length > 0 && (
               <p className="text-sm text-gray-600 mt-2">
-                {formData.images.length} photo{formData.images.length > 1 ? 's' : ''} selected
+                {formData.images.length} photo
+                {formData.images.length > 1 ? "s" : ""} selected
               </p>
             )}
           </div>
@@ -372,7 +397,7 @@ const PostCarPartForm = ({ onPartPosted }: { onPartPosted: () => void }) => {
             disabled={loading}
             className="w-full bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800"
           >
-            {loading ? 'Posting...' : 'Post Car Part'}
+            {loading ? "Posting..." : "Post Car Part"}
           </Button>
         </form>
       </CardContent>
